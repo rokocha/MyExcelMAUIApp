@@ -49,6 +49,8 @@ namespace MyExcelMAUIApp
 
         private void AddRowsAndCellEntries()
         {
+            grid.RowDefinitions.Add(new RowDefinition());
+
             for (int row = 0; row < InitialCountRow; row++)
             {
                 grid.RowDefinitions.Add(new RowDefinition());
