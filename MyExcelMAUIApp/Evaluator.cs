@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Antlr4.Runtime;
+using MathParserLibrary;
+using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Text.RegularExpressions;
 
 namespace MyExcelMAUIApp
@@ -18,14 +19,7 @@ namespace MyExcelMAUIApp
         {
             try
             {
-                // Використовуємо HashSet для відстеження зациклень (наприклад, A1=B1, а B1=A1)
-                var visitedCells = new HashSet<string>();
-                string parsedExpression = ReplaceCellReferences(expression, visitedCells);
-
-                // DataTable - простий спосіб порахувати математичний рядок у C#
-                var dataTable = new DataTable();
-                var result = dataTable.Compute(parsedExpression, "");
-
+                double result = EvaluateRecursively(expression, new HashSet<string>());
                 return result.ToString();
             }
             catch
@@ -34,37 +28,50 @@ namespace MyExcelMAUIApp
             }
         }
 
-        private string ReplaceCellReferences(string expression, HashSet<string> visitedCells)
+        private double EvaluateRecursively(string expression, HashSet<string> visited)
         {
-            // Шукаємо всі посилання формату 
+            var cellValues = new Dictionary<string, double>();
             var regex = new Regex(@"[A-Z]+[0-9]+");
 
-            return regex.Replace(expression, match =>
+            // Знаходимо всі комірки у формулі та рекурсивно обчислюємо їхні значення
+            foreach (Match match in regex.Matches(expression))
             {
                 string cellName = match.Value;
 
-                if (visitedCells.Contains(cellName))
-                {
-                    throw new Exception("Виявлено циклічне посилання");
-                }
-                visitedCells.Add(cellName);
+                // Захист від нескінченного циклу (наприклад, A1=B1, а B1=A1)
+                if (visited.Contains(cellName))
+                    throw new Exception("Циклічне посилання");
 
-                if (_formulas.ContainsKey(cellName))
-                {
-                    string cellValue = _formulas[cellName];
+                visited.Add(cellName);
 
-                    if (cellValue.StartsWith("="))
+                double val = 0;
+                if (_formulas.TryGetValue(cellName, out string content))
+                {
+                    if (content.StartsWith("="))
                     {
-                        // Якщо клітинка, на яку ми посилаємось, теж є формулою - рахуємо її рекурсивно
-                        return ReplaceCellReferences(cellValue.Substring(1), visitedCells);
+                        val = EvaluateRecursively(content.Substring(1), visited);
                     }
-
-                    // Якщо клітинка порожня, повертаємо 0 для математики
-                    return string.IsNullOrEmpty(cellValue) ? "0" : cellValue;
+                    else
+                    {
+                        double.TryParse(content, out val);
+                    }
                 }
 
-                return "0";
-            });
+                cellValues[cellName] = val;
+                visited.Remove(cellName);
+            }
+
+            // Передаємо вираз в ANTLR із підготовленими значеннями комірок
+            var inputStream = new AntlrInputStream(expression);
+            var lexer = new CalculatorLexer(inputStream);
+            var commonTokenStream = new CommonTokenStream(lexer);
+            var parser = new CalculatorParser(commonTokenStream);
+            var context = parser.compileUnit();
+
+            var visitor = new CalculatorVisitor(cellValues);
+
+            // Беремо .expr(), щоб уникнути помилки з нулем
+            return visitor.Visit(context.expr());
         }
     }
 }

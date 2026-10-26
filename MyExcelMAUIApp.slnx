@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="MathParserLibrary/MathParserLibrary.csproj" Id="9f98453a-3edb-43ec-a50d-3e3d80525e56" />
   <Project Path="MyExcelMAUIApp.Tests/MyExcelMAUIApp.Tests.csproj" Id="aca2772e-9a44-425e-a995-6771d60406b2" />
   <Project Path="MyExcelMAUIApp/MyExcelMAUIApp.csproj" />
 </Solution>
